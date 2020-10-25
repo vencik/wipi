@@ -1,0 +1,7 @@
+{
+    "controllers" : [{
+        "name"      : "system",
+        "class"     : "wipi.controller.System",
+        "enabled"   : true
+    }]
+}

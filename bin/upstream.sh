@@ -16,4 +16,4 @@ PATH="$venv_dir/bin:$PATH" uwsgi --need-app \
     --mount /wipi/api=wipi.api:app \
     --python-path "$wipi_dir" \
     --virtualenv "$venv_dir" \
-    --pyargv "$*"
+    --pyargv "$wipi_dir/etc/config.json"
