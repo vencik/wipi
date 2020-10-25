@@ -1,0 +1,16 @@
+# Python
+*.pyc
+__pycache__/
+*.egg-info
+dist/
+
+# UTs
+test/coverage.xml
+test/results.xml
+test/mypy.xml
+.coverage
+sonar-result
+.pylintrc
+
+# virtualenv
+.venv/

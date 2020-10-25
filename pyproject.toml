@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "wipi"
+version = "0.0.1"
+description = "Raspberry Pi wireless you-name-it controller"
+authors = [
+    "Vaclav Krpec <vencik@razdva.cz>",
+]
+packages = [
+    { include = "api", from = "wipi" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+uwsgi = "^2.0.19"
+flask = "^1.1.2"
+flask-voluptuous = "^0.1.2"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.4.3"
+pytest-mock-server = "^0.2.0"
+pylint = "^2.5.3"
+mypy = "^0.782"
+
+[[tool.poetry.source]]
+name = "pypi_"
+url = "https://pypi.org/simple/"
+default = true
+
+[build-system]
+requires = ["poetry >= 0.12"]
+build-backend = "poetry.masonry.api"

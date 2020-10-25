@@ -1,0 +1,27 @@
+Raspberry Pi wireless you-name-it controller
+============================================
+
+This project is sort of a template for anyone who wants their RPi to become
+a wireless cotroller for... um... anything, really.
+
+WORK IN PROGRES
+---------------
+
+It's very premature, now. Working on it..
+
+
+How it works
+------------
+
+Nginx reverse proxy running on the RPi + uWSGI\Flask\wipi application.
+The app. backend can be whatever you need; just implement the functionality you
+want and expose it over the API...
+
+Then, you can control the back-end device using a web application,
+e.g. from your smartphone.
+
+
+Author
+------
+
+Václav Krpec <vencik@razdva.cz>
