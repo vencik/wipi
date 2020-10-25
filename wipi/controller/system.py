@@ -1,4 +1,5 @@
 from typing import Dict
+from os import system
 
 from . import Controller
 
@@ -22,13 +23,13 @@ class System(Controller):
         Control power state
         :param state: "on"|"reboot"|"off"
         """
-        if state == "off":
-            print("TODO: Execute /sbin/shutdown -h now")
+        if self._state["power"] == "on" and state == "off":
+            system("/usr/bin/sudo /sbin/shutdown -h now")
+            self._state["power"] = "shutting down"
 
-        elif state == "reboot":
-            print("TODO: Execute /sbin/shutdown -r now")
-
-        self._state["power"] = state
+        elif self._state["power"] == "on" and state == "reboot":
+            system("/usr/bin/sudo /sbin/shutdown -r now")
+            self._state["power"] = "rebooting"
 
     def get_state(self) -> Dict:
         """

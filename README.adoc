@@ -13,12 +13,27 @@ It's very premature, now. Working on it..
 How it works
 ------------
 
-Nginx reverse proxy running on the RPi + uWSGI\Flask\wipi application.
-The app. backend can be whatever you need; just implement the functionality you
-want and expose it over the API...
+`Nginx` reverse proxy running on the RPi + `uWSGI`\`Flask`\`wipi` application.
+Collection of `wipi.controller.Controller` interface implementations is instantiated
+(if allowed in the configuration).
+The web app. backend translates API calls to the controllers get/set invocations.
 
-Then, you can control the back-end device using a web application,
-e.g. from your smartphone.
+So, you can control the back-end devices from your smartphone or anywhere on your
+LAN (or the RPi may act as an AP, creating separate LAN of its own).
+
+
+`systemd` cheatsheat
+--------------------
+
+Restart:
+----
+# systemctl restart wipi
+----
+
+Log:
+----
+# journalctl -elfu wipi
+----
 
 
 Author

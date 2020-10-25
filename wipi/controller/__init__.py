@@ -49,11 +49,9 @@ def load_controllers(config: Dict) -> None:
         args = controller.get("args", [])
         kwargs = controller.get("kwargs", {})
 
-        c1ass: Type[Controller] = getattr(
+        _controllers.append(getattr(
             import_module(cc2sc(class_name)),
-            class_name.split('.')[-1])
-
-        _controllers.append(c1ass(name, *args, **kwargs))
+            class_name.split('.')[-1])(name, *args, **kwargs))
 
 
 if len(argv) > 1:

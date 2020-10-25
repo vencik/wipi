@@ -27,21 +27,35 @@ class Backend:
         """
         return self._controllers.get(cname)
 
-    def get_state(self, cname: str) -> Dict:
+    def get_state(self, cname: str = None) -> Dict:
         """
         Get controller state
-        :param cname: Controller name
-        :return: Current constroller state
+        :param cname: Controller name or None
+        :return: Current constroller state or dict of (name, state) of all of them
         """
+        if cname is None:
+            return {
+                "controllers" : [{
+                    "name" : controller.name,
+                    "state" : controller.get_state(),
+                } for controller in self._controllers.values()]
+            }
+
         controller = self._get_ctrl(cname)
         return None if controller is None else controller.get_state()
 
-    def set_state(self, cname: str, state: Dict) -> Dict:
+    def set_state(self, cname: str = None, state: Dict = {}) -> Dict:
         """
         Set controller state
-        :param cname: Controller name
+        :param cname: Controller name or None
         :param state: State change
-        :return: Current constroller state
+        :return: Current constroller state or dict of (name, state) of all of them
         """
+        if cname is None:
+            for controller in state["controllers"]:
+                self.set_state(controller["name"], controller["state"])
+
+            return self.get_state()
+
         controller = self._get_ctrl(cname)
         return None if controller is None else controller.set_state(state)
