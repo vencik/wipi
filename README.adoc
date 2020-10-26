@@ -31,11 +31,13 @@ CLI cheatsheat
 --------------
 
 Restart:
+
 ----
 # systemctl restart wipi
 ----
 
 Log:
+
 ----
 # journalctl -elfu wipi
 ----
