@@ -8,7 +8,7 @@ wipi_dir=$(realpath "$this_dir/../")
 venv_dir="$wipi_dir/.venv"
 
 PATH="$venv_dir/bin:$PATH" uwsgi --need-app \
-    --processes 1 \
+    --processes 2 \
     --plugin python3 \
     --socket "$socket" \
     --chmod-socket=666 \

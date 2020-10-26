@@ -3,5 +3,9 @@
         "name"      : "system",
         "class"     : "wipi.controller.System",
         "enabled"   : true
+    }, {
+        "name"      : "accel_gyro",
+        "class"     : "wipi.controller.mpu6050",
+        "enabled"   : true
     }]
 }

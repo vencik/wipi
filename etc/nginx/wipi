@@ -10,6 +10,7 @@ server {
     location @api {
         include /etc/nginx/uwsgi_params;
         uwsgi_pass unix:/var/tmp/wipi.sock;
-        #uwsgi_buffering off;
+        uwsgi_buffering off;
+        #uwsgi_read_timeout 61s;
     }
 }

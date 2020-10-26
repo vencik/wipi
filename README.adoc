@@ -21,6 +21,11 @@ The web app. backend translates API calls to the controllers get/set invocations
 So, you can control the back-end devices from your smartphone or anywhere on your
 LAN (or the RPi may act as an AP, creating separate LAN of its own).
 
+The API also has support for down-streaming data, e.g. from sensors.
+You may set the stream to get data only from one controller, or from a collection
+of them.
+The stream is facilitated by using chunked encoding of the HTTP response.
+
 
 `systemd` cheatsheat
 --------------------

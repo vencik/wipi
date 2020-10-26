@@ -20,13 +20,22 @@ def raw_resp(content: Union[str, Iterator[str]], mime_type: str, status: int) ->
 
 def resp(content: Dict, status: int = HTTPStatus.OK, **kwargs) -> Response:
     """
-    Produce an error responce
+    Produce JSON responce
     :param content: JSON response content
     :param status: Response status
     :param kwargs: Additional keyword arguments for json.dump
     :return: Response object
     """
     return raw_resp(jsonify(content, **kwargs), "application/json", status)
+
+def chunked_resp(chunks: Iterator[str], status: int = HTTPStatus.OK) -> Response:
+    """
+    Produce chunked JSON response
+    :param chunks: JSON response content chunks generator
+    :param status: Response status
+    :return: Response object
+    """
+    return raw_resp(chunks, "application/json", status)
 
 
 @app.route("/", methods=["GET"])
@@ -45,6 +54,11 @@ def _contract(args) -> Response:
             "method" : "GET",
             "description" : "API contract description",
             "response" : "{... you're looking at it now ...}",
+        }, {
+            "uri" : req.url_root + "controllers",
+            "method" : "GET",
+            "description" : "Get list of enabled controllers",
+            "response" : ["controller1", "controller2", "..."],
         }, {
             "uri" : req.url_root + "get_state",
             "method" : "GET",
@@ -86,6 +100,12 @@ def _contract(args) -> Response:
     }, indent=4, sort_keys=True)
 
 
+@app.route("/controllers", methods=["GET"])
+@expect(Schema({}), 'args')  # no arguments expected
+def _controllers(args) -> Response:
+    return resp(backend.controllers())
+
+
 @app.route("/get_state", methods=["GET"])
 @expect(Schema({}), 'args')  # no arguments expected
 def _get_states(args) -> Response:
@@ -103,7 +123,6 @@ def _get_state(cname, args) -> Response:
         {"error" : "No such controller or not enabled"}, HTTPStatus.NOT_FOUND)
 
 
-# TODO: voluptuous schema check? (It'd have to be provided by the controller...)
 @app.route("/set_state", methods=["POST"])
 @expect(Schema({
     Required("controllers") : [{
@@ -117,7 +136,6 @@ def _set_states(json) -> Response:
     return resp(backend.set_state(state=json))
 
 
-# TODO: voluptuous schema check? (It'd have to be provided by the controller...)
 @app.route("/set_state/<cname>", methods=["POST"])
 @expect(Schema({
     str : All(),
@@ -129,3 +147,24 @@ def _set_state(cname, json) -> Response:
 
     return resp(
         {"error" : "No such controller or not enabled"}, HTTPStatus.NOT_FOUND)
+
+
+@app.route("/downstream", methods=["POST"])
+@expect(Schema({
+    Required("controllers") : [{
+        Required("name") : str,
+        Required("query") : {
+            str : All(),
+        }
+    }]
+}))
+def _downstreams(json) -> Response:
+    return chunked_resp(backend.downstream(query=json))
+
+
+@app.route("/downstream/<cname>", methods=["POST"])
+@expect(Schema({
+    str : All(),
+}))
+def _downstream(cname, json) -> Response:
+    return chunked_resp(backend.downstream(cname, json))
