@@ -27,8 +27,8 @@ of them.
 The stream is facilitated by using chunked encoding of the HTTP response.
 
 
-`systemd` cheatsheat
---------------------
+CLI cheatsheat
+--------------
 
 Restart:
 ----
@@ -38,6 +38,17 @@ Restart:
 Log:
 ----
 # journalctl -elfu wipi
+----
+
+
+`curl` API access
+~~~~~~~~~~~~~~~~~
+
+----
+$ curl http://10.20.30.40/wipi/api/controllers  # list of enabled controllers
+$ curl http://10.20.30.40/wipi/api/get_state  # GET API requests
+$ cure http://10.20.30.40/wipi/api/set_state/system -H "Content-Type: application/json" -d '{"power": "off"}'  # POST API requests
+$ curl --no-buffer http://10.20.30.40/wipi/api/downstream/accel_gyro -H "Content-Type: application/json -d '{"duration": 5, "interval": 0.333}'  # downstreaming
 ----
 
 
