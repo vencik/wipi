@@ -57,8 +57,11 @@ def _contract(args) -> Response:
         }, {
             "uri" : req.url_root + "controllers",
             "method" : "GET",
-            "description" : "Get list of enabled controllers",
-            "response" : ["controller1", "controller2", "..."],
+            "description" : "Get enabled controller names and types",
+            "response" : {
+                "name1" : "type1",
+                "name2" : "type2",
+            },
         }, {
             "uri" : req.url_root + "get_state",
             "method" : "GET",

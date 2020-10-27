@@ -1,4 +1,8 @@
 ;(function () {
+var import_oboe = document.createElement("script");
+import_oboe.src = "/wipi/oboe-browser.js";
+document.head.appendChild(import_oboe);
+
 /**
  * API GET call
  *
@@ -57,6 +61,24 @@ function api_post(jQuery, url, data_type, data, handler) {
 
 
 /**
+ * API downstream POST call
+ *
+ * @param {jQuery}   jQuery instance
+ * @param {string}   API URL
+ * @param {Object}   Request data (JSON)
+ * @param {Function} Response chunk handler: function(node)
+ * @param {Function} Response complete handler: function()
+ */
+function api_downstream_post(jQuery, url, data, handler, done_handler) {
+    oboe({
+        url     : url,
+        method  : "POST",
+        body    : data,
+    }).node("*", handler).done(done_handler);
+}
+
+
+/**
  * API contract
  *
  * @param {jQuery}   jQuery instance
@@ -69,7 +91,7 @@ function api_contract(jQuery, url, handler) {
 
 
 /**
- * List of controllers
+ * Controllers and their types
  *
  * @param {jQuery}   jQuery instance
  * @param {string}   API URL
@@ -138,10 +160,11 @@ function api_set_state(jQuery, url, name, state, handler) {
  * @param {jQuery}   jQuery instance
  * @param {string}   API URL
  * @param {object}   query
- * @param {Function} Response handler: function(status, data)
+ * @param {Function} Response handler: function(data)
+ * @param {Function} Response complete handler: function()
  */
-function api_downstreams(jQuery, url, query, handler) {
-    api_post(jQuery, url + "/downstream", "json", query, handler);
+function api_downstreams(jQuery, url, query, handler, done_handler) {
+    api_downstream_post(jQuery, url + "/downstream", query, handler, done_handler);
 }
 
 
@@ -153,9 +176,10 @@ function api_downstreams(jQuery, url, query, handler) {
  * @param {string}   Controller name
  * @param {object}   query
  * @param {Function} Response handler: function(status, data)
+ * @param {Function} Response complete handler: function()
  */
-function api_downstream(jQuery, url, name, query, handler) {
-    api_post(jQuery, url + "/downstream/" + name, "json", query, handler);
+function api_downstream(jQuery, url, name, query, handler, done_handler) {
+    api_downstream_post(jQuery, url + "/downstream/" + name, query, handler, done_handler);
 }
 
 

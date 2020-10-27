@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+
+<title>WiPi System Controller</title>
+
+<script type="text/javascript" src="../jquery.min.js"></script>
+<script type="text/javascript" src="../wipi.js"></script>
+
+</head>
+
+<body>
+<h1>WiPi System Controller</h1>
+
+Controller name: <span id="name"></span>
+<br />
+State: <div><pre id="state-pre"></div>
+
+<p />
+
+<div id="reboot">REBOOT</div>
+
+<p />
+
+<div id="shutdown">SHUT DOWN</div>
+
+</body>
+
+
+<script>
+;(function wipi(jQuery) {
+    if (!window.wipi) {
+        console.warn("window.wipi doesn't exist, can't load wipi API");
+        return;
+    }
+
+    var wipi = window.wipi(jQuery, "../api");
+
+    var name = $("#name");
+    var state_pre = $("#state-pre");
+    var reboot = $("#reboot");
+    var shutdown = $("#shutdown");
+
+    // Controller name
+    var cname = window.location.search.substring(1).split('&')[0].split('=')[1];
+    name.text(cname);
+
+    function update_state(state) {
+        state_pre.text(JSON.stringify(state, null, 4));
+    }
+
+    //
+    // Set on-click callbacks
+    //
+
+    reboot.click(function(e) {
+        wipi.set_state(cname, {"power": "reboot"}, function(status, state) {
+            update_state(state);
+        });
+    });
+
+    shutdown.click(function(e) {
+        wipi.set_state(cname, {"power": "off"}, function(status, state) {
+            update_state(state);
+        });
+    });
+
+
+    //
+    // Automatic controller states updates
+    //
+
+    var update_runs = false;
+    var update_id = null;
+
+    function update() {
+        wipi.get_state(cname, function(status, state) {
+            update_state(state);
+        });
+    }
+
+    function start_update() {
+        update();
+        update_id = window.setInterval(update, 5000);
+        update_runs = true;
+    }
+
+    function toggle_update() {
+        if (update_runs) {
+            window.clearInterval(update_id);
+            update_runs = false;
+        }
+        else start_update();
+    }
+
+    start_update();
+}((window.AJS && window.AJS.$) || window.jQuery))
+</script>
+
+</html>

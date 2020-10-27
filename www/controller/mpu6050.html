@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+
+<title>WiPi MPU6050 Controller</title>
+
+<script type="text/javascript" src="/wipi/jquery.min.js"></script>
+<script type="text/javascript" src="/wipi/wipi.js"></script>
+
+</head>
+
+<body>
+<h1>WiPi MPU6050 Controller</h1>
+
+Controller name: <span id="name"></span>
+<br />
+State: <div><pre id="state-pre"></div>
+
+<p />
+
+Interval: <input id="interval" type="text" value="0.333"><br />
+Duration: <input id="duration" type="text" value="6"><br />
+<div id="stream-data">STREAM</div>
+
+<p />
+
+Accelerometer readout:<br />
+<pre id="accel-data"></pre>
+
+<p />
+
+Gyroscope readout:<br />
+<pre id="gyro-data"></pre>
+
+</body>
+
+
+<script>
+;(function wipi(jQuery) {
+    if (!window.wipi) {
+        console.warn("window.wipi doesn't exist, can't load wipi API");
+        return;
+    }
+
+    var wipi = window.wipi(jQuery, "../api");
+
+    var name = $("#name");
+    var state_pre = $("#state-pre");
+    var stream = $("#stream-data");
+    var interval = $("#interval");
+    var duration = $("#duration");
+    var accel_data = $("#accel-data");
+    var gyro_data = $("#gyro-data");
+
+    // Controller name
+    var cname = window.location.search.substring(1).split('&')[0].split('=')[1];
+    name.text(cname);
+
+    function update_state(state) {
+        state_pre.text(JSON.stringify(state, null, 4));
+    }
+
+    function update() {
+        wipi.get_state(cname, function(status, state) {
+            update_state(state);
+        });
+    }
+
+    //
+    // Set on-click callbacks
+    //
+
+    state_pre.click(function(e) {
+        update();
+    });
+
+    stream.click(function(e) {
+        var args = {
+            "interval": parseFloat(interval.val()),
+            "duration": parseFloat(duration.val()),
+        };
+        wipi.downstream(cname, args, function(data) {
+            accel_data.text(JSON.stringify(data.accel_data));
+            gyro_data.text(JSON.stringify(data.gyro_data));
+        }, function() {
+            accel_data.text("");
+            gyro_data.text("");
+        });
+    });
+
+
+    //
+    // Automatic controller states updates
+    //
+
+    var update_runs = false;
+    var update_id = null;
+
+    function start_update() {
+        update();
+        update_id = window.setInterval(update, 5000);
+        update_runs = true;
+    }
+
+    function toggle_update() {
+        if (update_runs) {
+            window.clearInterval(update_id);
+            update_runs = false;
+        }
+        else start_update();
+    }
+
+    start_update();
+}((window.AJS && window.AJS.$) || window.jQuery))
+</script>
+
+</html>

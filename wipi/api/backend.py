@@ -4,6 +4,7 @@ from threading import Thread
 from queue import SimpleQueue as Queue, Empty as QueueEmpty
 
 from wipi.controller import Controller, controllers
+from wipi.util import cc2sc
 
 
 class Backend:
@@ -24,11 +25,13 @@ class Backend:
             for controller in controllers()
         }
 
-    def controllers(self) -> List[str]:
+    def controllers(self) -> Dict[str, str]:
         """
-        :return: List of enabled controllers' names
+        :return: List of enabled controllers' names and their types
         """
-        return list(self._controllers.keys())
+        return dict(
+            (c.name, cc2sc(c.__class__.__name__))
+            for c in self._controllers.values())
 
     def _get_ctrl(self, cname: str) -> Controller:
         """
@@ -46,9 +49,9 @@ class Backend:
         if cname is None:
             return {
                 "controllers" : [{
-                    "name" : controller.name,
-                    "state" : controller.get_state(),
-                } for controller in self._controllers.values()]
+                    "name" : cname,
+                    "state" : self.get_state(cname),
+                } for cname in self._controllers.keys()]
             }
 
         controller = self._get_ctrl(cname)
