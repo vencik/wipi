@@ -2,11 +2,13 @@ server {
     listen 80;
 
     server_name wipi;
-    root www;
-    index index.html;
+
+    location /wipi {
+        alias /var/www/html/wipi;
+        index index.html;
+    }
 
     location /wipi/api { try_files \$uri @api; }
-
     location @api {
         include /etc/nginx/uwsgi_params;
         uwsgi_pass unix:/var/tmp/wipi.sock;

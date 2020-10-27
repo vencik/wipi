@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+
+<style>
+</style>
+
+<title>WiPi</title>
+
+<script type="text/javascript" src="jquery.min.js"></script>
+<script type="text/javascript" src="wipi.js"></script>
+
+<style>
+</style>
+
+</head>
+
+<body>
+<h1>WiPi</h1>
+
+<!-- Controller states -->
+<table width="1000px">
+    <tbody id="ctrl-states">
+    </tbody>
+</table>
+
+</body>
+
+
+<script>
+;(function wipi(jQuery) {
+    if (!window.wipi) {
+        console.warn("window.wipi doesn't exist, can't load wipi API");
+        return;
+    }
+
+    var wipi = window.wipi(jQuery, "api");
+
+    var states_table = $("#ctrl-states");
+
+    function update_state(name, state) {
+        $("#" + name + "__state").text(JSON.stringify(state, null, 4));
+    }
+
+    function update_states(states) {
+        states.controllers.forEach(function(ctrl) {
+            update_state(ctrl.name, ctrl.state);
+        });
+    }
+
+
+    //
+    // Create table of controller states
+    //
+
+    wipi.get_states(function(status, states) {
+        states.controllers.sort(function(c1, c2) {
+            if (c1.name < c2.name) return -1;
+            if (c1.name > c2.name) return  1;
+            return 0;
+        });
+
+        states.controllers.forEach(function(ctrl) {
+            states_table.append(  // create table of controllers
+            "<tr>" +
+              "<td id='" + ctrl.name + "__name'>" + ctrl.name + "</td>" +
+              "<td><pre id='" + ctrl.name + "__state'></pre></td>" +
+            "</tr>");
+
+            // Set controller on-click callback (state update)
+            $("#" + ctrl.name + "__name").click(function(e) {
+                wipi.get_state(ctrl.name, function(status, state) {
+                    update_state(ctrl.name, state);
+                });
+            });
+        });
+
+        update_states(states);  // update controllers' states
+    });
+
+
+    //
+    // Automatic controller states updates
+    //
+
+    var update_runs      = false;
+    var update_status_id = null;
+    var update_stats_id  = null;
+
+    function update() {
+        wipi.get_states(function(status, states) {
+            update_states(states);
+        });
+    }
+
+    var update_runs = false;
+    var update_id = null;
+
+    function start_update() {
+        update();
+        update_id = window.setInterval(update, 5000);
+        update_runs = true;
+    }
+
+    function toggle_update() {
+        if (update_runs) {
+            window.clearInterval(update_id);
+            update_runs = false;
+        }
+        else start_update();
+    }
+
+    start_update();
+}((window.AJS && window.AJS.$) || window.jQuery))
+</script>
+
+</html>
