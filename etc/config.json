@@ -6,6 +6,10 @@
     }, {
         "name"      : "accel_gyro",
         "class"     : "wipi.controller.mpu6050",
+        "enabled"   : false
+    }, {
+        "name"      : "3relays",
+        "class"     : "wipi.controller.RelayBoard",
         "enabled"   : true
     }]
 }

@@ -7,8 +7,8 @@ StartLimitIntervalSec=0
 Type=simple
 Restart=always
 RestartSec=1
-User=vencik
-ExecStart=/home/vencik/src/wipi/bin/upstream.sh
+User=pi
+ExecStart=/home/pi/src/wipi/bin/upstream.sh
 
 [Install]
 WantedBy=multi-user.target

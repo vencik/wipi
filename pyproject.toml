@@ -17,6 +17,8 @@ flask-voluptuous = "^0.1.2"
 mpu6050-raspberrypi = "^1.1"
 pause = "^0.2"
 pysmbus = "^0.1-3"
+voluptuous = "^0.12.0"
+"rpi.gpio" = "^0.7.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.4.3"

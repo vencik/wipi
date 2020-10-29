@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+
+<title>WiPi Relay Board Controller</title>
+
+<script type="text/javascript" src="../jquery.min.js"></script>
+<script type="text/javascript" src="../wipi.js"></script>
+
+</head>
+
+<body>
+<h1>WiPi Relay Board Controller</h1>
+
+Controller name: <span id="name"></span>
+<br />
+State: <div><pre id="state-pre"></div>
+
+<p />
+<table>
+  <tbody id="relays">
+  </tbody>
+</table>
+
+</body>
+
+
+<script>
+;(function wipi(jQuery) {
+    if (!window.wipi) {
+        console.warn("window.wipi doesn't exist, can't load wipi API");
+        return;
+    }
+
+    var wipi = window.wipi(jQuery, "../api");
+
+    var name = $("#name");
+    var state_pre = $("#state-pre");
+    var relays = $("#relays");
+
+    // Controller name
+    var cname = window.location.search.substring(1).split('&')[0].split('=')[1];
+    name.text(cname);
+
+    //
+    // Create relay table and set state toggle actions
+    //
+
+    function relay_state(relay) {
+        return $("#relay" + relay + "-state");
+    }
+
+    function set_relay_state(relay, rstate) {
+        relay_state(relay).attr("checked", rstate == "closed");
+    }
+
+    function update_state(state) {
+        state_pre.text(JSON.stringify(state, null, 4));
+        for (const [relay, rstate] of Object.entries(state)) {
+            set_relay_state(relay, rstate);
+        }
+    }
+
+    function toggle_state(relay, rstate) {
+        wipi.set_state(cname, {[relay]: rstate}, function(status, state) {
+            update_state(state);
+        });
+    }
+
+    wipi.get_state(cname, function(status, state) {
+        Object.keys(state).sort().forEach(function(relay) {
+            relays.append(
+                '<tr id="relay' + relay + '">'+
+                  '<td>' + relay + '</td>'+
+                  '<td><input id="relay' + relay + '-state" type="checkbox" /></td>'+
+                '</tr>'
+            );
+            relay_state(relay).click(function (e) {
+                toggle_state(relay, this.checked ? "closed" : "open");
+            });
+        });
+        update_state(state);
+    });
+
+
+    //
+    // Automatic controller states updates
+    //
+
+    var update_runs = false;
+    var update_id = null;
+
+    function update() {
+        wipi.get_state(cname, function(status, state) {
+            update_state(state);
+        });
+    }
+
+    function start_update() {
+        update_id = window.setInterval(update, 5000);
+        update_runs = true;
+    }
+
+    function toggle_update() {
+        if (update_runs) {
+            window.clearInterval(update_id);
+            update_runs = false;
+        }
+        else start_update();
+    }
+
+    start_update();
+}((window.AJS && window.AJS.$) || window.jQuery))
+</script>
+
+</html>
