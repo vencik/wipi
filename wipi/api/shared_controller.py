@@ -5,6 +5,10 @@ from multiprocessing import Process, Pipe, Lock
 from multiprocessing.connection import Connection
 
 from wipi.controller import Controller
+from wipi.log import get_logger
+
+
+log = get_logger(__name__)
 
 
 class SharedController(Controller):
@@ -16,7 +20,18 @@ class SharedController(Controller):
 
     class Task(ABC):
         """
-        Task for the shared controller
+        Task for the shared controller (interface)
+        """
+        @abstractmethod
+        def execute(self, ctrl: Controller) -> None:
+            """
+            Execute task
+            :param ctrl: Wrapped controller
+            """
+
+    class ResultTask(Task):
+        """
+        Task which gives result back
         """
 
         def __init__(self, pipe_we: Connection, *args, **kwargs):
@@ -32,14 +47,7 @@ class SharedController(Controller):
             """
             self._pipe_we.send(result)
 
-        @abstractmethod
-        def execute(self, ctrl: Controller) -> None:
-            """
-            Execute task
-            :param ctrl: Wrapped controller
-            """
-
-    class GetStateTask(Task):
+    class GetStateTask(ResultTask):
         """
         Execute get_state on the shared controller
         """
@@ -51,7 +59,7 @@ class SharedController(Controller):
             """
             self.send(ctrl.get_state())
 
-    class SetStateTask(Task):
+    class SetStateTask(ResultTask):
         """
         Execute set_state on the shared controller
         """
@@ -71,7 +79,25 @@ class SharedController(Controller):
             """
             self.send(ctrl.set_state(self._state))
 
-    class DownstreamTask(Task):
+    class MuteSetStateTask(Task):
+        """
+        Execute set_state on the shared controller, discarding result
+        """
+
+        def __init__(self, state: Dict):
+            """
+            :param state: State changes
+            """
+            self._state = state
+
+        def execute(self, ctrl: Controller) -> None:
+            """
+            Execute ctrl.set_state
+            :param ctrl: Wrapped controller
+            """
+            ctrl.set_state(self._state)
+
+    class DownstreamTask(ResultTask):
         """
         Execute downstream on the shared controller
         """
@@ -108,6 +134,8 @@ class SharedController(Controller):
             name=f"{self.__class__.__name__}({self._ctrl.__class__.__name__}.{self._ctrl.name})",
             target=self._worker_routine)
 
+        log.info(f"{self.baseclass}.{self.name}: Controller created")
+
     def _send(self, task: SharedController.Task) -> None:
         """
         Send task to worker over pipe
@@ -126,6 +154,8 @@ class SharedController(Controller):
         :return: self
         """
         self._worker.start()
+        log.info(f"{self.baseclass}.{self.name}: Controller started")
+
         return self
 
     def get_state(self, pipe_re: Connection, pipe_we: Connection) -> Dict:
@@ -149,6 +179,14 @@ class SharedController(Controller):
         self._send(SharedController.SetStateTask(pipe_we, state))
         return pipe_re.recv()
 
+    def mute_set_state(self, state: Dict) -> None:
+        """
+        Controlled device state setter (discards result)
+        Used for deferred set_state actions.
+        :param state: State changes
+        """
+        self._send(SharedController.MuteSetStateTask(state))
+
     def downstream(self, query: Dict, pipe_re: Connection, pipe_we: Connection) -> Iterator[Dict]:
         """
         Downstream data from the controller
@@ -171,11 +209,14 @@ class SharedController(Controller):
         """
         self._send(None)  # worker shutdown trigger
         self._worker.join()
+        log.info(f"{self.baseclass}.{self.name}: Controller stopped")
 
     def _worker_routine(self):
         """
         Controller wrapper worker routine
         """
+        log.info(f"{self.baseclass}.{self.name}: Worker starts")
+
         try:
             while True:
                 task = self._pipe_re.recv()
@@ -187,6 +228,8 @@ class SharedController(Controller):
 
         except KeyboardInterrupt:
             pass  # interrupted by SIGINT
+
+        log.info(f"{self.baseclass}.{self.name}: Worker terminates")
 
     def __del__(self):
         if self._worker.is_alive():

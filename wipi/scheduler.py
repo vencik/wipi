@@ -1,10 +1,14 @@
 from __future__ import annotations
 from typing import Callable, List, Union, Optional
-from threading import Thread, Lock
-from multiprocessing import Pipe
+from multiprocessing import Process, Pipe, Lock
 from functools import total_ordering
 from heapq import heappush, heappop
 from datetime import datetime, timedelta
+
+from wipi.log import get_logger
+
+
+log = get_logger(__name__)
 
 
 class Scheduler:
@@ -21,7 +25,7 @@ class Scheduler:
         """
 
         def __init__(self,
-            action: Callable[[], None],
+            action: Callable,
             at: Union[datetime, List[datetime]] = None):
             """
             :param action: Executed action
@@ -35,7 +39,7 @@ class Scheduler:
             self.at: List[datetime] = [at] if isinstance(at, datetime) else at
             assert len(self.at) > 0
 
-            self._forever_interval: timedelta = None
+            self.forever_interval: timedelta = None
 
         def repeat(self, times: Union[int, str], interval: float) -> Scheduler.Task:
             """
@@ -58,7 +62,7 @@ class Scheduler:
 
             if type(times) is str:
                 assert times == "forever"
-                self._forever_interval = interval_td
+                self.forever_interval = interval_td
 
             else:
                 for _ in range(times):
@@ -66,19 +70,25 @@ class Scheduler:
 
             return self
 
-        def execute(self) -> Optional[Scheduler.Task]:
+        def execute(self, args: List, kwargs: Dict) -> Optional[Scheduler.Task]:
             """
             Execute task
+            :param args: Arguments passed to Scheduler constructor
+            :param kwargs: Arguments passed to Scheduler constructor
             :return: Task (for re-scheduling) or None
             """
-            self.action()
+            action = self.action
+
+            log.info(f"Executing {self}: {action}({args}, {kwargs})")
+            action(*args, **kwargs)
+
             exec_time = self.at.pop(0)
 
             if len(self.at) > 0:
                 return self  # still more scheduling times
 
-            if self._forever_interval is not None:  # reschedule forever
-                self.at.append(exec_time + self._forever_interval)
+            if self.forever_interval is not None:  # reschedule forever
+                self.at.append(exec_time + self.forever_interval)
                 return self
 
             return None
@@ -92,18 +102,33 @@ class Scheduler:
         def __lt__(self, other):
             return self.at[0] < other.at[0]
 
+        def __str__(self) -> str:
+            return self.__class__.__name__ + str({
+                "action" : self.action,
+                "at" : self.at,
+                "forever_interval" : self.forever_interval,
+            })
+
     _shutdown = "shutdown"  # worker shutdown sentinel
     _cancel = "cancel"      # scheduled tasks cancelation sentinel
 
-    def __init__(self):
+    def __init__(self, args: List = [], kwargs: Dict = {}):
+        """
+        :param args: Arguments passed to the task action
+        :param kwargs: Arguments passed to the task action
+        """
         rend, wend = Pipe(duplex=False)
 
+        self._args = args
+        self._kwargs = kwargs
         self._pipe_re = rend
         self._pipe_we = wend
         self._pipe_wl = Lock()
-        self._worker = Thread(
+        self._worker = Process(
             name=self.__class__.__name__,
             target=self._worker_routine)
+
+        log.info("Scheduler created")
 
     def _send(self, msg: Union[Scheduler.Task, str]) -> None:
         """
@@ -123,6 +148,8 @@ class Scheduler:
         :return: self
         """
         self._worker.start()
+        log.info("Scheduler started")
+
         return self
 
     def schedule(self, task: Scheduler.Task) -> None:
@@ -145,44 +172,59 @@ class Scheduler:
         self._send(Scheduler._shutdown)
         self._worker.join()
 
+        log.info("Scheduler stopped")
+
     def _worker_routine(self) -> None:
-        tasks: List[Scheduler.Task] = []
+        log.info("Worker starts")
 
-        timeout: float = None
-        while True:
-            # Poll for new tasks
-            if self._pipe_re.poll(timeout=timeout):
-                task = self._pipe_re.recv()
+        try:
+            tasks: List[Scheduler.Task] = []
 
-                # Sentinels
-                if type(task) is str:
-                    # Shut down
-                    if task == Scheduler._shutdown:
-                        break
+            timeout: float = None
+            while True:
+                # Poll for new tasks
+                if self._pipe_re.poll(timeout=timeout):
+                    task = self._pipe_re.recv()
 
-                    # Cancel all scheduled tasks
-                    if task == Scheduler._cancel:
-                        tasks = []
+                    # Sentinels
+                    if type(task) is str:
+                        # Shut down
+                        if task == Scheduler._shutdown:
+                            break
 
-                # Schedule task
-                else:
-                    assert isinstance(task, Scheduler.Task)
-                    heappush(tasks, task)
+                        # Cancel all scheduled tasks
+                        if task == Scheduler._cancel:
+                            log.info(f"Cancelling {len(tasks)} scheduled tasks")
+                            tasks = []
 
-            # An action is due
-            else:
-                while len(tasks) > 0 and tasks[0].at[0] <= datetime.now():
-                    task = heappop(tasks).execute()
+                    # Schedule task
+                    else:
+                        assert isinstance(task, Scheduler.Task)
 
-                    # Reschedule
-                    if task is not None:
+                        log.info(f"Scheduling {task}")
                         heappush(tasks, task)
 
-            # Set polling timeout (i.e. time to earliest task execution)
-            if len(tasks) > 0:
-                timeout = (tasks[0].at[0] - datetime.now()).total_seconds()
-            else:
-                timeout = None
+                # An action is due
+                else:
+                    while len(tasks) > 0 and tasks[0].at[0] <= datetime.now():
+                        task = heappop(tasks).execute(
+                            args=self._args, kwargs=self._kwargs)
+
+                        # Reschedule
+                        if task is not None:
+                            log.info(f"Rescheduling {task}")
+                            heappush(tasks, task)
+
+                # Set polling timeout (i.e. time to earliest task execution)
+                if len(tasks) > 0:
+                    timeout = (tasks[0].at[0] - datetime.now()).total_seconds()
+                else:
+                    timeout = None
+
+        except KeyboardInterrupt:
+            pass  # interrupted by SIGINT
+
+        log.info("Worker terminates")
 
     def __del__(self):
         if self._worker.is_alive():

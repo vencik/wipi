@@ -3,10 +3,16 @@ from json import dumps as jsonify
 from http import HTTPStatus
 
 from flask import Response, request as req
-from flask_voluptuous import expect, Schema, Required, All
+from flask_voluptuous import expect, Schema, Required, All, Union as Uni
 
 from . import app, backend
 
+
+def empty_resp(status: int = HTTPStatus.NO_CONTENT) -> Response:
+    """
+    Produce response without response body
+    """
+    return Response("", status=status)
 
 def raw_resp(content: Union[str, Iterator[str]], mime_type: str, status: int) -> Response:
     """
@@ -150,6 +156,48 @@ def _set_state(cname, json) -> Response:
 
     return resp(
         {"error" : "No such controller or not enabled"}, HTTPStatus.NOT_FOUND)
+
+
+@app.route("/set_state_deferred", methods=["POST"])
+@expect(Schema({
+    Required("controllers") : [{
+        Required("name") : str,
+        Required("state") : {
+            str : All(),
+        },
+    }],
+    "at" : Uni(str, [str]),
+    "repeat" : [{
+        "times" : int,
+        Required("interval") : Uni(float, int)
+    }]
+}))
+def _set_states_deferred(json) -> Response:
+    backend.set_state_deferred(state=json)
+    return empty_resp()
+
+
+@app.route("/set_state_deferred/<cname>", methods=["POST"])
+@expect(Schema({
+    Required("state") : {
+        str : All(),
+    },
+    "at" : Uni(str, [str]),
+    "repeat" : [{
+        "times" : int,
+        Required("interval") : Uni(float, int)
+    }]
+}))
+def _set_state_deferred(cname, json) -> Response:
+    backend.set_state_deferred(cname, json)
+    return empty_resp()
+
+
+@app.route("/cancel_deferred", methods=["GET"])
+@expect(Schema({}), 'args')  # no arguments expected
+def _cancel_deferred(args) -> Response:
+    backend.cancel_deferred()
+    return empty_resp()
 
 
 @app.route("/downstream", methods=["POST"])

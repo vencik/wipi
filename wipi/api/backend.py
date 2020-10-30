@@ -6,16 +6,28 @@ from multiprocessing import Pipe
 from os import getpid
 from multiprocessing.util import _exit_function as multiprocessing_exit_function
 import atexit
+from datetime import datetime
+from functools import partial
 
 from wipi.controller import Controller, controllers
+from wipi.scheduler import Scheduler
+from wipi.log import get_logger
 
 from .shared_controller import SharedController
+
+
+log = get_logger(__name__)
 
 
 class Backend:
     """
     API backend
     """
+
+    class Error(Exception):
+        """
+        Backend errors
+        """
 
     def __init__(self, chunking_timeout: float = 20.0):
         """
@@ -31,11 +43,16 @@ class Backend:
             for controller in controllers()
         }
 
+        # Deferred actions scheduler
+        self._scheduler = Scheduler(kwargs={"self": self}).start()
+
         # Master API worker PID (needed for correct shared resources shutdown)
         self._master_pid = getpid()
 
         # SharedController worker -> API worker communication pipe
         self._pipe: Tuple[Connection, Connection] = None
+
+        log.info(f"Backend created")
 
     def worker_postfork(self) -> None:
         """
@@ -49,8 +66,12 @@ class Backend:
         """
         self._pipe = Pipe(duplex=False)
 
-        if getpid() != self._master_pid:
+        if getpid() == self._master_pid:
+            log.info("Master worker ready")
+
+        else:  # forked worker
             atexit.unregister(multiprocessing_exit_function)
+            log.info("Worker ready")
 
     def controllers(self) -> Dict[str, str]:
         """
@@ -99,6 +120,62 @@ class Backend:
 
         controller = self._get_ctrl(cname)
         return None if controller is None else controller.set_state(state, *self._pipe)
+
+    def mute_set_state(self, cname: str = None, state: Dict = {}) -> None:
+        """
+        Set controller state discarding the result
+        :param cname: Controller name on None
+        :param state: State change
+        """
+        if cname is None:
+            for controller in state["controllers"]:
+                self.mute_set_state(controller["name"], controller["state"])
+        else:
+            controller = self._get_ctrl(cname)
+            if controller is not None:
+                controller.mute_set_state(state)
+
+    def set_state_deferred(self, cname: str = None, state: Dict = {}) -> None:
+        """
+        Set controller state later
+        :param when: Schedule
+        :param cname: Controller name or None
+        :param state: State change
+        """
+        def dt_spec2dt(dt_spec) -> datetime:
+            return datetime.strptime(dt_spec, "%Y/%m/%d %H:%M:%S")
+
+        at_spec: Union[str, List[str]] = state.pop("at") if "at" in state else None
+        repeats: List[Dict] = state.pop("repeat") if "repeat" in state else []
+        if cname:
+            state = state.get("state", {})
+
+        # Execution times
+        at: List[datetime] = None
+        if at_spec is not None:
+            if type(at_spec) is str:
+                at = [dt_spec2dt(at_spec)]
+            elif type(at_spec) is list:
+                at = [dt_spec2dt(dt_spec) for dt_spec in at_spec]
+            else:
+                raise Backend.Error(f"Invalid date-time specification: {at_spec}")
+
+        task = Scheduler.Task(
+            partial(Backend.mute_set_state, cname=cname, state=state), at)
+
+        # Repetitions
+        for repeat in repeats:
+            times: Union[int, str] = repeat.get("times")
+            interval = float(repeat.get("interval"))
+            task.repeat("forever" if times is None else int(times), interval)
+
+        self._scheduler.schedule(task)
+
+    def cancel_deferred(self) -> None:
+        """
+        Cancel all scheduled deferred actions
+        """
+        self._scheduler.cancel()
 
     def _async_chunks(self, cgens: List[Tuple[str, Iterator[Dict]]]) -> Iterator[Dict]:
         """
@@ -186,8 +263,14 @@ class Backend:
         Shut backend down
         """
         if getpid() == self._master_pid:  # this worker is the master
+            self._scheduler.stop()
             for controller in self._controllers.values():
                 controller.stop()
+
+            log.info("Master worker shut down")
+
+        else:
+            log.info("Worker shut down")
 
     def __del__(self):
         self.shutdown()
