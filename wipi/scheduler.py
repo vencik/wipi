@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Callable, List, Union, Optional
-from threading import Thread
+from threading import Thread, Lock
 from multiprocessing import Pipe
 from functools import total_ordering
 from heapq import heappush, heappop
@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 class Scheduler:
     """
     Deferred actions scheduler
-    Actions are executed in a separate thread at specified times.
+    Actions are executed in a separate worker at specified times.
     They may be added at any time.
     """
 
@@ -100,34 +100,49 @@ class Scheduler:
 
         self._pipe_re = rend
         self._pipe_we = wend
+        self._pipe_wl = Lock()
         self._worker = Thread(
             name=self.__class__.__name__,
             target=self._worker_routine)
 
-    def start(self) -> None:
+    def _send(self, msg: Union[Scheduler.Task, str]) -> None:
+        """
+        Send message to worker via the pipe
+        multiprocessing.Pipe.send calls are mutually exclusive.
+        :param msg: Message sent
+        """
+        self._pipe_wl.acquire()
+        try:
+            self._pipe_we.send(msg)
+        finally:
+            self._pipe_wl.release()
+
+    def start(self) -> Scheduler:
         """
         Start scheduler worker
+        :return: self
         """
         self._worker.start()
+        return self
 
     def schedule(self, task: Scheduler.Task) -> None:
         """
         Schedule task
         :param task: Task
         """
-        self._pipe_we.send(task)
+        self._send(task)
 
     def cancel(self) -> None:
         """
         Cancel all scheduled tasks
         """
-        self._pipe_we.send(Scheduler._cancel)
+        self._send(Scheduler._cancel)
 
     def stop(self) -> None:
         """
         Stop scheduler worker
         """
-        self._pipe_we.send(Scheduler._shutdown)
+        self._send(Scheduler._shutdown)
         self._worker.join()
 
     def _worker_routine(self) -> None:
