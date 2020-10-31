@@ -3,6 +3,11 @@ server {
 
     server_name wipi;
 
+    location / {
+        alias /var/www/html/;
+        index index.html;
+    }
+
     location /wipi {
         alias /var/www/html/wipi;
         index index.html;
