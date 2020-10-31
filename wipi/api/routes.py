@@ -105,6 +105,73 @@ def _contract(args) -> Response:
             "description" : "Set/change status of specified controller",
             "request" : "{... new controller state (subset) dict ...}",
             "response" : "{... controller state dict ...}",
+        }, {
+            "uri" : req.url_root + "set_state_deferred",
+            "method" : "POST",
+            "description" : "Schedule set/change status of some/all controllers",
+            "request" : {
+                "controllers" : [{
+                    "name" : "controller name",
+                    "state" : "{... new controller state (subset) dict ...}",
+                }],
+                "at" : "Optional time spec in form of 'YYYY/MM/DD HH:MM:SS' " +
+                       "or list of these (if omitted, the action is performed ASAP)",
+                "repeat" : [{
+                    "times" : "Optional integer, says how many times the action " +
+                              "shall be repeated after the last scheduled time " +
+                              "in 'at' (if omitted, the action will repeat " +
+                              "indefinitely)",
+                    "interval" : "Required float, sets the repetition interval",
+                }],
+            },
+            "response" : "None, will just respond with 204 on successful scheduling",
+        }, {
+            "uri" : req.url_root + "set_state_deferred/<controller name>",
+            "method" : "POST",
+            "description" : "Schedule set/change status of specified controller",
+            "request" : {
+                "state" : "{... new controller state (subset) dict ...}",
+                "at" : "Optional time spec in form of 'YYYY/MM/DD HH:MM:SS' " +
+                       "or list of these (if omitted, the action is performed ASAP)",
+                "repeat" : [{
+                    "times" : "Optional integer, says how many times the action " +
+                              "shall be repeated after the last scheduled time " +
+                              "in 'at' (if omitted, the action will repeat " +
+                              "indefinitely)",
+                    "interval" : "Required float, sets the repetition interval",
+                }],
+            },
+            "response" : "None, will just respond with 204 on successful scheduling",
+        }, {
+            "uri" : req.url_root + "cancel_deferred",
+            "method" : "GET",
+            "description" : "Cancel all scheduled status sets/changes",
+            "response" : "None, will just respond with 204 on successful scheduling",
+        }, {
+            "uri" : req.url_root + "downstream",
+            "method" : "POST",
+            "description" : "Stream data from controllers (using chunked-encoded " +
+                            "HTML response)",
+            "request" : {
+                "controllers": [{
+                    "name" : "controller name",
+                    "query" : "{... controller streaming query ...}",
+                }],
+            },
+            "response" : [
+                "{... controllers' stream data chunks comming incrementally " +
+                "(note that they'll come in an interleaved manner, as individual " +
+                "controllers produce them) ...}",
+            ],
+        }, {
+            "uri" : req.url_root + "downstream/<controller name>",
+            "method" : "POST",
+            "description" : "Stream data from controller (using chunked-encoded " +
+                            "HTML response)",
+            "request" : "{... controller streaming query ...}",
+            "response" : [
+                "{... controller stream data chunks comming incrementally ...}"
+            ],
         }],
     }, indent=4, sort_keys=True)
 

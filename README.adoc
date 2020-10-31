@@ -4,14 +4,9 @@ Raspberry Pi wireless you-name-it controller
 This project is sort of a template for anyone who wants their RPi to become
 a wireless cotroller for... um... anything, really.
 
-WORK IN PROGRES
----------------
 
-It's very premature, now. Working on it..
-
-
-How it works
-------------
+How does it work
+----------------
 
 `Nginx` reverse proxy running on the RPi + `uWSGI`\`Flask`\`wipi` application.
 Collection of `wipi.controller.Controller` interface implementations is instantiated
@@ -21,10 +16,70 @@ The web app. backend translates API calls to the controllers get/set invocations
 So, you can control the back-end devices from your smartphone or anywhere on your
 LAN (or the RPi may act as an AP, creating separate LAN of its own).
 
+Moreover, you may schedule future state changes.
+The scheduler supports multiple explicit times of action execution and repetitive
+executions after an interval (limited or indefinite) and combinations of both.
+
 The API also has support for down-streaming data, e.g. from sensors.
 You may set the stream to get data only from one controller, or from a collection
 of them.
 The stream is facilitated by using chunked encoding of the HTTP response.
+
+The API has (may have) multiple parallel request/response workers (4 by default),
+so it may process multiple requests at once.
+But each controller queries are queued and processed in series by the controller,
+as each controller has its own, single worker.
+(Queries to different controllers are processed in parallel.)
+Note that you may choose to start multiple instances of the same controller
+(if that makes sense), each with a different name.
+
+
+Extensibility
+~~~~~~~~~~~~~
+
+`wipi` isn't comitted to any particular controller implementation.
+Instead, it's a framework that allows addition of any controllers, general or
+specialised to particular application.
+Each controller may (or may not) be accompanied with its own front-end app
+(served by `nginx`).
+
+Put simply, the only thing you need to do to add your own functionality into `wipi`
+is to implement the `wipi.controller.Controller` interface (and potentially
+create a FE for it).
+Then, your functionality shall be available over the `wipi` API.
+
+
+Prerequisites
+-------------
+
+The SW was developed on Raspberry Pi Zero W and ODROID W---so the HW requirements
+are indeed minimal.
+Recent Raspberry OS or Debian distro is advisable (as always).
+On system level, a few actions are required:
+* Install `nginx`, `pyenv` and `poetry`. You'll also need `make` for convenience.
+* Enable and start `systemd-timesyncd` (if you want to schedule actions at
+  distinct times).
+  Note that RPi Zero and similar don't have RTC, so you'll need it connected to
+  a network with NTP server to keep proper time.
+* Make sure the `pi` user can execute system commands via `sudo` without password
+  (if you want `wipi` to be able to e.g. shut the system down, restart etc).
+* If you use controllers that access system resources such as I2C etc, make sure
+  that the `pi` user is in respective system groups (has privileges).
+* ... and some more, probably. I'll have to re-do the installation to add all the
+  steps---I don't remember all of them, unfortunately. If you use this, feel free
+  to update the README and send a pull request, it will be much appreciated.
+
+
+Front-End
+---------
+
+I'm not a FE developer, I can't do it properly.
+I never wanted to do FE (I have highest respect to FE developers, but it's just
+not my cup of tea).
+
+The FE which comes with `wipi` is just a demo, a starting point for somebody who
+could actually do justice to it.
+If you'd like to have a go, your contributions shall be, again, much appreciated.
 
 
 CLI cheatsheat
@@ -43,14 +98,32 @@ Log:
 ----
 
 
-`curl` API access
-~~~~~~~~~~~~~~~~~
+`curl` API access (examples)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ----
+$ curl http://10.20.30.40/wipi/api/  # API contract description
 $ curl http://10.20.30.40/wipi/api/controllers  # list of enabled controllers
 $ curl http://10.20.30.40/wipi/api/get_state  # GET API requests
-$ curl http://10.20.30.40/wipi/api/set_state/system -H "Content-Type: application/json" -d '{"power": "off"}'  # POST API requests
-$ curl --no-buffer http://10.20.30.40/wipi/api/downstream/accel_gyro -H "Content-Type: application/json -d '{"duration": 5, "interval": 0.333}'  # downstreaming
+$ curl http://10.20.30.40/wipi/api/set_state/system \
+       -H "Content-Type: application/json" \
+       -d '{"power": "off"}'  # POST API requests
+$ curl http://10.20.30.40/wipi/api/set_state_deferred/3relays \
+       -H "Content-Type: application/json" \
+       -d '{"state": {"relay2": "closed"}, at: "2020/10/31 10:00:00"}'
+       # deferred set_state, shall be done at the time specified
+$ curl http://10.20.30.40/wipi/api/set_state_deferred/3relays \
+       -H "Content-Type: application/json" \
+       -d '{"state": {"relay1": "open"}, "repeat": [{"interval": 30.0}]}'
+       # deferred set_state, shall be done immediately and repeat every 30s
+$ curl http://10.20.30.40/wipi/api/set_state_deferred/3relays \
+       -H "Content-Type: application/json" \
+       -d '{"state": {"relay3": "open"}, "repeat": [{"times": 3, "interval": 10.0}]}'
+       # deferred set_state, shall be done now and another 3 times, 10s apart
+$ curl http://10.20.30.40/wipi/api/cancel_deferred  # cancel scheduled actions
+$ curl --no-buffer http://10.20.30.40/wipi/api/downstream/accel_gyro \
+       -H "Content-Type: application/json -d '{"duration": 5, "interval": 0.333}'
+       # 5s long stream of accelerometer & gyroscope data (3 measurements per second)
 ----
 
 
