@@ -155,6 +155,48 @@ function api_set_state(jQuery, url, name, state, handler) {
 
 
 /**
+ * Schedule setting states of some controllers
+ *
+ * @param {jQuery}   jQuery instance
+ * @param {string}   API URL
+ * @param {object}   Schedule
+ * @param {Function} Response handler: function(status)
+ */
+function api_set_states_deferred(jQuery, url, schedule, handler) {
+    api_post(jQuery, url + "/set_state_deferred", "json", schedule,
+        function (status, data) { handler(status); });
+}
+
+
+/**
+ * Schedule setting state of one controller
+ *
+ * @param {jQuery}   jQuery instance
+ * @param {string}   API URL
+ * @param {string}   Controller name
+ * @param {object}   Schedule
+ * @param {Function} Response handler: function(status)
+ */
+function api_set_state_deferred(jQuery, url, name, schedule, handler) {
+    api_post(jQuery, url + "/set_state_deferred/" + name, "json", schedule,
+        function (status, data) { handler(status); });
+}
+
+
+/**
+ * Cancel all scheduled actions
+ *
+ * @param {jQuery}   jQuery instance
+ * @param {string}   API URL
+ * @param {Function} Response handler: function(status)
+ */
+function api_cancel_deferred(jQuery, url, handler) {
+    api_get(jQuery, url + "/cancel_deferred", "json",
+        function (status, data) { handler(status); });
+}
+
+
+/**
  * Downstream from some controllers
  *
  * @param {jQuery}   jQuery instance
@@ -200,14 +242,17 @@ function api_downstream(jQuery, url, name, query, handler, done_handler) {
  */
 function api(jQuery, url) {
     return {
-        contract    : api_contract.bind(null, jQuery, url),
-        controllers : api_controllers.bind(null, jQuery, url),
-        get_states  : api_get_states.bind(null, jQuery, url),
-        get_state   : api_get_state.bind(null, jQuery, url),
-        set_states  : api_set_states.bind(null, jQuery, url),
-        set_state   : api_set_state.bind(null, jQuery, url),
-        downstreams : api_downstreams.bind(null, jQuery, url),
-        downstream  : api_downstream.bind(null, jQuery, url),
+        contract            : api_contract.bind(null, jQuery, url),
+        controllers         : api_controllers.bind(null, jQuery, url),
+        get_states          : api_get_states.bind(null, jQuery, url),
+        get_state           : api_get_state.bind(null, jQuery, url),
+        set_states          : api_set_states.bind(null, jQuery, url),
+        set_state           : api_set_state.bind(null, jQuery, url),
+        set_states_deferred : api_set_states_deferred.bind(null, jQuery, url),
+        set_state_deferred  : api_set_state_deferred.bind(null, jQuery, url),
+        cancel_deferred     : api_cancel_deferred.bind(null, jQuery, url),
+        downstreams         : api_downstreams.bind(null, jQuery, url),
+        downstream          : api_downstream.bind(null, jQuery, url),
     };
 }
 

@@ -17,11 +17,64 @@ Controller name: <span id="name"></span>
 <br />
 State: <div><pre id="state-pre"></div>
 
-<p />
+<h3>Toggle state</h3>
 <table>
-  <tbody id="relays">
+  <tbody id="relays-toggle">
   </tbody>
 </table>
+
+<h3>Schedule state change</h3>
+<table>
+  <tbody id="relays-schedule">
+  </tbody>
+</table>
+
+<br />
+at (add times):
+<table>
+  <thead>
+    <tr>
+      <td>
+        <input id="deferred-at-input" type="text" value="" />
+      </td><td>
+        <input id="deferred-at-add" type="button" value="ADD TIME" />
+      </td>
+    </tr>
+  </thead>
+  <tbody id="deferred-at">
+  </tbody>
+</table>
+
+<br />
+and repeat (add repeat definitions):
+<table>
+  <thead>
+    <tr>
+      <td>
+        <input id="deferred-repeat-times-input" type="text" size="3" value="0" />
+        times in interval of
+        <input id="deferred-repeat-interval-input" type="text" size="5" value="10" />
+        seconds
+      </td><td>
+        <input id="deferred-repeat-add" type="button" value="ADD REPEAT" />
+      </td>
+    </tr>
+  </thead>
+  <tbody id="deferred-repeat">
+  </tbody>
+</table>
+
+<br />
+and then indefinitely in interval of
+<input id="deferred-repeat-forever-interval" type="text" size="5" value="10" />
+seconds (check to apply):
+<input id="deferred-repeat-forever" type="checkbox" />
+<p />
+<input id="deferred-send" type="button" value="SCHEDULE" />
+<input id="deferred-cancel" type="button" value="CANCEL ALL" />
+
+<p />
+<pre id="deferred-set-state-pre"></pre>
 
 </body>
 
@@ -35,20 +88,19 @@ State: <div><pre id="state-pre"></div>
 
     var wipi = window.wipi(jQuery, "../api");
 
-    var name = $("#name");
-    var state_pre = $("#state-pre");
-    var relays = $("#relays");
-
     // Controller name
     var cname = window.location.search.substring(1).split('&')[0].split('=')[1];
-    name.text(cname);
+    $("#name").text(cname);
 
     //
-    // Create relay table and set state toggle actions
+    // State report & state toggle functions
     //
+
+    var state_pre = $("#state-pre");
+    var relays_toggle = $("#relays-toggle");
 
     function relay_state(relay) {
-        return $("#relay" + relay + "-state");
+        return $("#" + relay + "-state");
     }
 
     function set_relay_state(relay, rstate) {
@@ -68,17 +120,184 @@ State: <div><pre id="state-pre"></div>
         });
     }
 
+
+    //
+    // Deferred state change functions
+    //
+
+    var relays_schedule = $("#relays-schedule");
+    var deferred_at_input = $("#deferred-at-input");
+    var deferred_at_add = $("#deferred-at-add");
+    var deferred_at = $("#deferred-at");
+    var deferred_repeat_times_input = $("#deferred-repeat-times-input");
+    var deferred_repeat_interval_input = $("#deferred-repeat-interval-input");
+    var deferred_repeat_add = $("#deferred-repeat-add");
+    var deferred_repeat = $("#deferred-repeat");
+    var deferred_send = $("#deferred-send");
+    var deferred_cancel = $("#deferred-cancel");
+    var deferred_set_state_pre = $("#deferred-set-state-pre");
+    var deferred_repeat_forever = $("#deferred-repeat-forever");
+    var deferred_repeat_forever_interval = $("#deferred-repeat-forever-interval");
+
+    var obj_id = 0
+    function get_id() {
+        return obj_id++;
+    }
+
+    function deferred_request_show() {
+        deferred_set_state_pre.text(JSON.
+            stringify(deferred_request_body(), null, 4));
+    }
+
+    function selected_relays_state() {
+        var state = {};
+        $("#relays-schedule tr").each(function () {
+            var relay = $(this).find($("span")).text();
+            var rstate = $(this).find($("select")).val();
+            if (rstate != "ignore") state[relay] = rstate;
+        });
+        return state;
+    }
+
+    deferred_at_add.click(function (e) {
+        var row_id = "deferred-at-row-" + get_id();
+        deferred_at.append(
+            '<tr id="' + row_id + '">'+
+              '<td><span>' + deferred_at_input.val() + '</span></td>'+
+              '<td>'+
+                '<input id="' + row_id + '-remove" type="button" value="REMOVE" />'+
+              '</td>'+
+            '</tr>');
+        var remove = $("#" + row_id + "-remove");
+        remove.click(function (e) {
+            $("#" + row_id).remove()
+            deferred_request_show();
+        });
+        deferred_request_show();
+    });
+
+    deferred_repeat_add.click(function (e) {
+        var row_id = "deferred-repeat-row-" + get_id();
+        deferred_repeat.append(
+            '<tr id="' + row_id + '">'+
+              '<td>'+
+                '<span name="times">'+
+                  deferred_repeat_times_input.val()+
+                '</span>'+
+                ' times in interval of '+
+                '<span name="interval">'+
+                  deferred_repeat_interval_input.val()+
+                '</span>'+
+              '</td>'+
+              '<td>'+
+                '<input id="' + row_id + '-remove" type="button" value="REMOVE" />'+
+              '</td>'+
+            '</tr>');
+        var remove = $("#" + row_id + "-remove");
+        remove.click(function (e) {
+            $("#" + row_id).remove()
+            deferred_request_show();
+        });
+        deferred_request_show();
+    });
+
+    function deferred_request_body() {
+        var req_body = {"state": selected_relays_state()};
+
+        var at = [];
+        $("#deferred-at tr td span").each(function () {
+            at.push($(this).text());
+        });
+        if (at.length > 0) {
+            req_body["at"] = at;
+        }
+
+        var repeat = [];
+        $("#deferred-repeat tr").each(function () {
+            repeat.push({
+                "times" : parseInt($(this).find($("span[name='times']")).text()),
+                "interval" : parseFloat($(this).find($("span[name='interval']")).text()),
+            });
+        });
+        if (deferred_repeat_forever.is(":checked")) {
+            repeat.push({
+                "interval" : deferred_repeat_forever_interval.val(),
+            });
+        }
+        if (repeat.length > 0) {
+            req_body["repeat"] = repeat;
+        }
+
+        return req_body;
+    }
+
+    relays_schedule.change(function (e) {
+        deferred_request_show();
+    });
+
+    deferred_repeat_forever.change(function (e) {
+        deferred_request_show();
+    });
+
+    deferred_repeat_forever_interval.change(function (e) {
+        deferred_request_show();
+    });
+
+    deferred_send.click(function (e) {
+        wipi.set_state_deferred(cname, deferred_request_body(), function (status) {
+            deferred_set_state_pre.text(status == 204 ? "SCHEDULED": "FAILED");
+        });
+    });
+
+    deferred_cancel.click(function (e) {
+        wipi.cancel_deferred(function (status) {
+            deferred_set_state_pre.text(status == 204 ? "CANCELLED": "FAILED");
+        });
+    });
+
+    function dt2str(dt) {
+        function n2nn(n) { return n < 10 ? "0" + n : n; }
+
+        return dt.getFullYear() + "/" +
+            n2nn(dt.getMonth() + 1) + "/" +
+            n2nn(dt.getDate()) + " " +
+            n2nn(dt.getHours()) + ":" +
+            n2nn(dt.getMinutes()) + ":" +
+            n2nn(dt.getSeconds());
+    }
+
+    deferred_at_input.val(dt2str(new Date()));
+    deferred_request_show();
+
+
+    //
+    // Initialise relay tables
+    //
+
     wipi.get_state(cname, function(status, state) {
         Object.keys(state).sort().forEach(function(relay) {
-            relays.append(
+            relays_toggle.append(
                 '<tr id="relay' + relay + '">'+
                   '<td>' + relay + '</td>'+
-                  '<td><input id="relay' + relay + '-state" type="checkbox" /></td>'+
+                  '<td><input id="' + relay + '-state" type="checkbox" /></td>'+
                 '</tr>'
             );
             relay_state(relay).click(function (e) {
                 toggle_state(relay, this.checked ? "closed" : "open");
             });
+
+            relays_schedule.append(
+                '<tr id="' + relay + '-schedule">'+
+                  '<td>'+
+                    '<select id="' + relay + '-state" type="checkbox">'+
+                      '<option value="ignore" selected>Don\'t change</option>'+
+                      '<option value="closed">Close</option>'+
+                      '<option value="open">Open</option>'+
+                    '</select>'+
+                  '</td>'+
+                  '<td><span id="' + relay + '-name">' + relay + '</span></td>'+
+                '</tr>'
+            );
         });
         update_state(state);
     });
