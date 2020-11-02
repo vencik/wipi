@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Case Washer</title>
+
+<script type="text/javascript" src="/wipi/jquery.min.js"></script>
+<script type="text/javascript" src="/wipi/wipi.js"></script>
+
+<style>
+  p {
+    font-size: 20px;
+  }
+
+  input {
+    border-top-style: hidden;
+    border-right-style: hidden;
+    border-left-style: hidden;
+    border-bottom-style: groove;
+    background-color: #eee;
+    font-size: 30px;
+  }
+
+  td {
+    font-size: 30px;
+  }
+</style>
+
+
+</head>
+
+<body>
+<h1>Spent Cartridge Case Washer</h1>
+
+<p>
+  Connect the washer to outlet 1 and the hot air pistol to outlet 2.
+</p>
+
+<table width="400px">
+  <tr>
+    <td>
+      Wash for:
+      <input id="washing-time" type="text" size="3" value="20" />
+      minutes
+    </td>
+    <td align="right">
+      <img id="washing-start" src="/wipi/application/case_washer/start.png" />
+    </td>
+    <td>
+  </tr>
+  <tr>
+    <td align="left" colspan="2">
+      <img id="stop" src="/wipi/application/case_washer/stop.png" />
+    </td>
+  </tr>
+  <tr>
+    <td>
+      Dry for:
+      <input id="drying-time" type="text" size="3" value="45" />
+      minutes
+      <br />
+      Rotate every
+      <input id="drying-rotate-interval" type="text" size="3" value="5" />
+      minutes
+    </td>
+    <td align="right">
+      <img id="drying-start" src="/wipi/application/case_washer/start.png" />
+    </td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2">
+      <p />
+      <input id="shutdown" type="button" value="SHUT DOWN" />
+    </td>
+  </tr>
+</table>
+
+</body>
+
+
+<script>
+;(function wipi(jQuery) {
+    if (!window.wipi) {
+        console.warn("window.wipi doesn't exist, can't load wipi API");
+        return;
+    }
+
+    var wipi = window.wipi(jQuery, "/wipi/api");
+
+    var cname = "3relays";  // controller name
+    var washing_time = $("#washing-time");
+    var washing_start = $("#washing-start");
+    var drying_time = $("#drying-time");
+    var drying_rotate_interval = $("#drying-rotate-interval");
+    var drying_start = $("#drying-start");
+    var stop = $("#stop");
+    var shutdown = $("#shutdown");
+
+    function dt2str(dt) {
+        function n2nn(n) { return n < 10 ? "0" + n : n; }
+
+        return dt.getFullYear() + "/" +
+            n2nn(dt.getMonth() + 1) + "/" +
+            n2nn(dt.getDate()) + " " +
+            n2nn(dt.getHours()) + ":" +
+            n2nn(dt.getMinutes()) + ":" +
+            n2nn(dt.getSeconds());
+    }
+
+    function future_datetime(time_s, base=null) {
+        if (base == null) base = new Date();
+        return new Date(base.getTime() + time_s * 1000);
+    }
+
+    function close_relay(relay, time_s) {
+        wipi.set_state_deferred(cname, {
+            "state" : {
+                [relay] : "open",
+            },
+            "at" : dt2str(future_datetime(time_s)),
+
+        }, function(status) {
+            if (status != 204) {
+                alert("Failed to set washer stop time");
+                return;
+            }
+
+            wipi.set_state(cname, {
+                [relay] : "closed"
+            }, function (status, resp) {
+                if (status != 200) {
+                    alert("Failed to start washer");
+                    return;
+                }
+            });
+        });
+    }
+
+    washing_start.click(function (e) {
+        if (!confirm("Commence washing for " + washing_time.val() + " minutes?"))
+            return;
+
+        close_relay("relay1", washing_time.val() * 60);
+    });
+
+    drying_start.click(function (e) {
+        if (!confirm("Commence drying for " + drying_time.val() + " minutes?"))
+            return;
+
+        var rotate_interval_s = drying_rotate_interval.val() * 60;
+        var time_s = drying_time.val() * 60;
+        var start_dt = future_datetime(rotate_interval_s);
+        var stop_dt = future_datetime(rotate_interval_s + 1);
+        var times = parseInt(time_s / rotate_interval_s) - 1;
+        if (times < 0) times = 0;
+
+        wipi.set_state_deferred(cname, {
+            "state" : {
+                "relay1" : "closed",
+            },
+            "at" : dt2str(start_dt),
+            "repeat" : [{
+                "times" : parseInt(times),
+                "interval" : parseFloat(rotate_interval_s),
+            }],
+
+        }, function (status) {
+            if (status != 204) {
+                alert("Failed to schedule washer rotations starts");
+                return;
+            }
+
+            wipi.set_state_deferred(cname, {
+                "state" : {
+                    "relay1" : "open",
+                },
+                "at" : dt2str(stop_dt),
+                "repeat" : [{
+                    "times" : parseInt(times),
+                    "interval" : parseFloat(rotate_interval_s),
+                }],
+
+            }, function (status) {
+                if (status != 204) {
+                    alert("Failed to schedule washer rotations stops");
+                    return;
+                }
+            });
+        });
+
+        close_relay("relay2", time_s);
+    });
+
+    stop.click(function (e) {
+        wipi.set_state(cname, {
+            "relay1" : "open",
+            "relay2" : "open",
+        }, function (status, resp) {
+            if (status != 200) {
+                alert("Failed to stop the washer");
+            }
+
+            wipi.cancel_deferred(function (status) {
+                if (status != 204) {
+                    alert("Failed to cancel scheduled actions");
+                    return;
+                }
+
+                alert("Program stopped");
+            });
+        });
+    });
+
+    shutdown.click(function (e) {
+        if (confirm("Shut the washer power controller down?")) {
+            wipi.set_state("system", {"power": "off"}, function (status, resp) {
+                if (status != 200) {
+                    alert("Failed to shut the controller down");
+                }
+
+                window.close();
+            });
+        }
+    });
+
+}((window.AJS && window.AJS.$) || window.jQuery))
+</script>
+
+</html>
