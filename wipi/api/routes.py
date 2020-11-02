@@ -143,6 +143,24 @@ def _contract(args) -> Response:
             },
             "response" : "None, will just respond with 204 on successful scheduling",
         }, {
+            "uri" : req.url_root + "list_deferred",
+            "method" : "GET",
+            "description" : "List all scheduled status sets/changes",
+            "response" : [{
+                "controller" : "Controller name",
+                "state" : "{... new controller state (subset) dict ...}",
+                "at" : ["YYYY/MM/DD HH:MM:SS"],
+            }],
+        }, {
+            "uri" : req.url_root + "list_deferred/<controller name>",
+            "method" : "GET",
+            "description" : "List controller's scheduled status sets/changes",
+            "response" : [{
+                "controller" : "<controller name> (as specified, may be ignored)",
+                "state" : "{... new controller state (subset) dict ...}",
+                "at" : ["YYYY/MM/DD HH:MM:SS"],
+            }],
+        }, {
             "uri" : req.url_root + "cancel_deferred",
             "method" : "GET",
             "description" : "Cancel all scheduled status sets/changes",
@@ -258,6 +276,18 @@ def _set_states_deferred(json) -> Response:
 def _set_state_deferred(cname, json) -> Response:
     backend.set_state_deferred(cname, json)
     return empty_resp()
+
+
+@app.route("/list_deferred", methods=["GET"])
+@expect(Schema({}), 'args')  # no arguments expected
+def _list_all_deferred(args) -> Response:
+    return resp(backend.list_deferred())
+
+
+@app.route("/list_deferred/<cname>", methods=["GET"])
+@expect(Schema({}), 'args')  # no arguments expected
+def _list_deferred(cname, args) -> Response:
+    return resp(backend.list_deferred(cname))
 
 
 @app.route("/cancel_deferred", methods=["GET"])

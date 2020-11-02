@@ -171,6 +171,24 @@ class Backend:
 
         self._scheduler.schedule(task)
 
+    def list_deferred(self, cname: str = None) -> None:
+        """
+        Get list of deferred actions
+        :param cname: Controller name
+        """
+        def dt2dt_spec(dt: datetime) -> str:
+            return dt.strftime("%Y/%m/%d %H:%M:%S")
+
+        tasks = self._scheduler.tasks(self._pipe)
+        if cname is not None:
+            tasks = [t for t in tasks if cname == t.action.keywords["cname"]]
+
+        return [{
+            "controller" : t.action.keywords["cname"],
+            "state" : t.action.keywords["state"],
+            "at" : [dt2dt_spec(dt) for dt in t.at],
+        } for t in tasks]
+
     def cancel_deferred(self) -> None:
         """
         Cancel all scheduled deferred actions

@@ -71,6 +71,7 @@ seconds (check to apply):
 <input id="deferred-repeat-forever" type="checkbox" />
 <p />
 <input id="deferred-send" type="button" value="SCHEDULE" />
+<input id="deferred-list" type="button" value="LIST SCHEDULED" />
 <input id="deferred-cancel" type="button" value="CANCEL ALL" />
 
 <p />
@@ -134,6 +135,7 @@ seconds (check to apply):
     var deferred_repeat_add = $("#deferred-repeat-add");
     var deferred_repeat = $("#deferred-repeat");
     var deferred_send = $("#deferred-send");
+    var deferred_list = $("#deferred-list");
     var deferred_cancel = $("#deferred-cancel");
     var deferred_set_state_pre = $("#deferred-set-state-pre");
     var deferred_repeat_forever = $("#deferred-repeat-forever");
@@ -145,8 +147,8 @@ seconds (check to apply):
     }
 
     function deferred_request_show() {
-        deferred_set_state_pre.text(JSON.
-            stringify(deferred_request_body(), null, 4));
+        deferred_set_state_pre.text(
+            JSON.stringify(deferred_request_body(), null, 4));
     }
 
     function selected_relays_state() {
@@ -246,6 +248,17 @@ seconds (check to apply):
     deferred_send.click(function (e) {
         wipi.set_state_deferred(cname, deferred_request_body(), function (status) {
             deferred_set_state_pre.text(status == 204 ? "SCHEDULED": "FAILED");
+        });
+    });
+
+    deferred_list.click(function (e) {
+        wipi.list_deferred(cname, function (status, resp) {
+            if (status != 200) {
+                deferred_set_state_pre.text(resp);
+                return;
+            }
+
+            deferred_set_state_pre.text(JSON.stringify(resp, null, 4));
         });
     });
 

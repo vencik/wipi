@@ -184,6 +184,31 @@ function api_set_state_deferred(jQuery, url, name, schedule, handler) {
 
 
 /**
+ * List all scheduled actions
+ *
+ * @param {jQuery}   jQuery instance
+ * @param {string}   API URL
+ * @param {Function} Response handler: function(status, data)
+ */
+function api_list_all_deferred(jQuery, url, handler) {
+    api_get(jQuery, url + "/list_deferred", "json", handler);
+}
+
+
+/**
+ * List scheduled actions of one controller
+ *
+ * @param {jQuery}   jQuery instance
+ * @param {string}   API URL
+ * @param {string}   Controller name
+ * @param {Function} Response handler: function(status, data)
+ */
+function api_list_deferred(jQuery, url, name, handler) {
+    api_get(jQuery, url + "/list_deferred/" + name, "json", handler);
+}
+
+
+/**
  * Cancel all scheduled actions
  *
  * @param {jQuery}   jQuery instance
@@ -250,6 +275,8 @@ function api(jQuery, url) {
         set_state           : api_set_state.bind(null, jQuery, url),
         set_states_deferred : api_set_states_deferred.bind(null, jQuery, url),
         set_state_deferred  : api_set_state_deferred.bind(null, jQuery, url),
+        list_all_deferred   : api_list_all_deferred.bind(null, jQuery, url),
+        list_deferred       : api_list_deferred.bind(null, jQuery, url),
         cancel_deferred     : api_cancel_deferred.bind(null, jQuery, url),
         downstreams         : api_downstreams.bind(null, jQuery, url),
         downstream          : api_downstream.bind(null, jQuery, url),

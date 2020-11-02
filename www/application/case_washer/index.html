@@ -10,8 +10,12 @@
 <script type="text/javascript" src="/wipi/wipi.js"></script>
 
 <style>
-  p {
+  h1 {
     font-size: 20px;
+  }
+
+  p {
+    font-size: 15px;
   }
 
   input {
@@ -24,7 +28,11 @@
   }
 
   td {
-    font-size: 30px;
+    font-size: 25px;
+  }
+
+  img {
+    opacity: 1.0;
   }
 </style>
 
@@ -32,32 +40,37 @@
 </head>
 
 <body>
-<h1>Spent Cartridge Case Washer</h1>
-
-<p>
+<center>
+  <h1>Spent Cartridge Case Washer</h1>
   Connect the washer to outlet 1 and the hot air pistol to outlet 2.
-</p>
+</center>
 
 <table width="400px">
   <tr>
-    <td>
-      Wash for:
+    <td align="left">
+      <img id="washing-start" src="/wipi/application/case_washer/start.png" />
+    </td>
+    <td align="left" colspan="2">
+      Wash for
       <input id="washing-time" type="text" size="3" value="20" />
       minutes
     </td>
-    <td align="right">
-      <img id="washing-start" src="/wipi/application/case_washer/start.png" />
-    </td>
     <td>
   </tr>
   <tr>
+    <td align="center">
+      <img id="washer-state" src="/wipi/application/case_washer/status.png" />
+    </td>
+    <td>
+      <span id="washer-state-info"></span>
+    </td>
+  </tr>
+  <tr>
+    <td align="left">
+      <img id="drying-start" src="/wipi/application/case_washer/start.png" />
+    </td>
     <td align="left" colspan="2">
-      <img id="stop" src="/wipi/application/case_washer/stop.png" />
-    </td>
-  </tr>
-  <tr>
-    <td>
-      Dry for:
+      Dry for
       <input id="drying-time" type="text" size="3" value="45" />
       minutes
       <br />
@@ -65,14 +78,13 @@
       <input id="drying-rotate-interval" type="text" size="3" value="5" />
       minutes
     </td>
-    <td align="right">
-      <img id="drying-start" src="/wipi/application/case_washer/start.png" />
-    </td>
   </tr>
   <tr>
-    <td align="center" colspan="2">
-      <p />
-      <input id="shutdown" type="button" value="SHUT DOWN" />
+    <td align="left">
+      <img id="stop" src="/wipi/application/case_washer/stop.png" />
+    </td>
+    <td align="right">
+      <img id="shutdown" src="/wipi/application/case_washer/off.png" />
     </td>
   </tr>
 </table>
@@ -96,6 +108,8 @@
     var drying_rotate_interval = $("#drying-rotate-interval");
     var drying_start = $("#drying-start");
     var stop = $("#stop");
+    var washer_state_info = $("#washer-state-info");
+    var washer_state = $("#washer-state");
     var shutdown = $("#shutdown");
 
     function dt2str(dt) {
@@ -114,69 +128,80 @@
         return new Date(base.getTime() + time_s * 1000);
     }
 
-    function close_relay(relay, time_s) {
+    function set_opacity(img, opacity) {
+        img.css("opacity", opacity);
+    }
+
+    function close_relay(application, relay, time_s, handler) {
         wipi.set_state_deferred(cname, {
             "state" : {
+                "application" : application,
                 [relay] : "open",
             },
             "at" : dt2str(future_datetime(time_s)),
 
         }, function(status) {
             if (status != 204) {
-                alert("Failed to set washer stop time");
+                alert("Failed to set " + application + " stop time");
                 return;
             }
 
             wipi.set_state(cname, {
+                "application" : application,
                 [relay] : "closed"
             }, function (status, resp) {
                 if (status != 200) {
-                    alert("Failed to start washer");
+                    alert("Failed to start " + application);
                     return;
                 }
+
+                handler(status, resp);
             });
         });
     }
 
-    washing_start.click(function (e) {
-        if (!confirm("Commence washing for " + washing_time.val() + " minutes?"))
-            return;
-
-        close_relay("relay1", washing_time.val() * 60);
-    });
-
-    drying_start.click(function (e) {
-        if (!confirm("Commence drying for " + drying_time.val() + " minutes?"))
-            return;
-
-        var rotate_interval_s = drying_rotate_interval.val() * 60;
-        var time_s = drying_time.val() * 60;
-        var start_dt = future_datetime(rotate_interval_s);
-        var stop_dt = future_datetime(rotate_interval_s + 1);
-        var times = parseInt(time_s / rotate_interval_s) - 1;
-        if (times < 0) times = 0;
-
-        wipi.set_state_deferred(cname, {
-            "state" : {
-                "relay1" : "closed",
-            },
-            "at" : dt2str(start_dt),
-            "repeat" : [{
-                "times" : parseInt(times),
-                "interval" : parseFloat(rotate_interval_s),
-            }],
-
-        }, function (status) {
-            if (status != 204) {
-                alert("Failed to schedule washer rotations starts");
+    function enable_washing() {
+        set_opacity(washing_start, 1.0);
+        washing_start.off("click");
+        washing_start.click(function (e) {
+            if (!confirm("Commence washing for " + washing_time.val() + " minutes?"))
                 return;
-            }
+
+            close_relay("washing", "relay1", washing_time.val() * 60,
+            function (status, resp) {
+                set_state();
+            });
+        });
+    }
+
+    function disable_washing() {
+        set_opacity(washing_start, 0.3);
+        washing_start.off("click");
+        washing_start.click(function (e) {
+            alert("Washing or drying is ongoing");
+        });
+    }
+
+    function enable_drying() {
+        set_opacity(drying_start, 1.0);
+        drying_start.off("click");
+        drying_start.click(function (e) {
+            if (!confirm("Commence drying for " + drying_time.val() + " minutes?"))
+                return;
+
+            var rotate_interval_s = drying_rotate_interval.val() * 60;
+            var time_s = drying_time.val() * 60;
+            var start_dt = future_datetime(rotate_interval_s);
+            var stop_dt = future_datetime(rotate_interval_s + 1);
+            var times = parseInt(time_s / rotate_interval_s) - 1;
+            if (times < 0) times = 0;
 
             wipi.set_state_deferred(cname, {
                 "state" : {
-                    "relay1" : "open",
+                    "application" : "drying",
+                    "relay1" : "closed",
                 },
-                "at" : dt2str(stop_dt),
+                "at" : dt2str(start_dt),
                 "repeat" : [{
                     "times" : parseInt(times),
                     "interval" : parseFloat(rotate_interval_s),
@@ -184,14 +209,42 @@
 
             }, function (status) {
                 if (status != 204) {
-                    alert("Failed to schedule washer rotations stops");
+                    alert("Failed to schedule washer rotations starts");
                     return;
                 }
+
+                wipi.set_state_deferred(cname, {
+                    "state" : {
+                        "application" : "drying",
+                        "relay1" : "open",
+                    },
+                    "at" : dt2str(stop_dt),
+                    "repeat" : [{
+                        "times" : parseInt(times),
+                        "interval" : parseFloat(rotate_interval_s),
+                    }],
+
+                }, function (status) {
+                    if (status != 204) {
+                        alert("Failed to schedule washer rotations stops");
+                        return;
+                    }
+                });
+            });
+
+            close_relay("drying", "relay2", time_s, function (status, resp) {
+                set_state();
             });
         });
+    }
 
-        close_relay("relay2", time_s);
-    });
+    function disable_drying() {
+        set_opacity(drying_start, 0.3);
+        drying_start.off("click");
+        drying_start.click(function (e) {
+            alert("Washing or drying is ongoing");
+        });
+    }
 
     stop.click(function (e) {
         wipi.set_state(cname, {
@@ -208,8 +261,121 @@
                     return;
                 }
 
-                alert("Program stopped");
+                set_state();
             });
+        });
+    });
+
+    function current_state(handler) {
+        wipi.list_deferred(cname, function (status, resp) {
+            if (status != 200) {
+                alert("Failed to query the state");
+                return;
+            }
+
+            var washing_tasks = [];
+            var drying_tasks = [];
+            resp.forEach(function (task) {
+                var tasks = null;
+
+                var application = task["state"]["application"];
+                if (application == "washing") {
+                    tasks = washing_tasks;
+                }
+                if (application == "drying") {
+                    tasks = drying_tasks;
+                }
+
+                // Decode scheduled actions
+                var actions = [];
+                if (task["state"]["relay1"] == "open")
+                    actions.push({"washer": "off"});
+                else if (task["state"]["relay1"] == "closed")
+                    actions.push({"washer": "on"});
+                if (task["state"]["relay2"] == "open")
+                    actions.push({"hot air pistol": "off"});
+                else if (task["state"]["relay2"] == "closed")
+                    actions.push({"hot air pistol": "on"});
+
+                // Unpack execution times
+                task["at"].forEach(function (at) {
+                    tasks.push({
+                        "at" : at,
+                        "actions" : actions,
+                    });
+                });
+            });
+
+            function task_cmp_by_exec_time(t1, t2) {
+                if (t1["at"] < t2["at"]) return -1;
+                if (t1["at"] > t2["at"]) return  1;
+                return 0;
+            }
+
+            handler({
+                "washing" : washing_tasks.sort(task_cmp_by_exec_time),
+                "drying" : drying_tasks.sort(task_cmp_by_exec_time),
+            });
+        });
+    }
+
+    function set_state() {
+        current_state(function (state) {
+            function info(application, tasks) {
+                return tasks.length == 0 ? ""
+                    : application + " will end at " + tasks[tasks.length-1]["at"];
+            }
+
+            var washing_info = info("Washing", state["washing"]);
+            var drying_info = info("Drying", state["drying"]);
+
+            washer_state_info.text(washing_info);
+            if (washer_state_info.text() != "" && drying_info != "")
+                washer_state_info.text(washer_state_info.text() + ", ");
+            washer_state_info.text(washer_state_info.text() + drying_info);
+
+            if (washer_state_info.text() == "") {
+                washer_state_info.text("Idle");
+                set_opacity(washer_state, 0.3);
+                enable_washing();
+                enable_drying();
+            }
+            else {
+                set_opacity(washer_state, 1.0);
+                disable_washing();
+                disable_drying();
+            }
+        });
+    }
+
+    washer_state.click(function (e) {
+        current_state(function (state) {
+            function serialise_tasks(application, tasks) {
+                if (tasks.length == 0) return "";
+
+                var result = application + " will end at " +
+                    tasks[tasks.length-1]["at"] + ":\n";
+
+                tasks.forEach(function (task) {
+                    result += "\tat " + task["at"];
+                    var separator = " ";
+                    task["actions"].forEach(function (action) {
+                        for (const [what, state] of Object.entries(action)) {
+                            result += separator + "turn " + what + " " + state;
+                            separator = " and";
+                        }
+                    });
+                    result += "\n";
+                });
+
+                return result;
+            }
+
+            var washing = serialise_tasks("Washing", state["washing"]);
+            var drying = serialise_tasks("Drying", state["drying"]);
+            var info = washing + (washing != "" ? "\n" : "") + drying;
+            if (info != "")
+                alert(info);
         });
     });
 
@@ -224,6 +390,14 @@
             });
         }
     });
+
+
+    //
+    // Status updates
+    //
+
+    set_state();
+    update_id = window.setInterval(set_state, 5000);
 
 }((window.AJS && window.AJS.$) || window.jQuery))
 </script>

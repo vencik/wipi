@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Callable, List, Union, Optional
 from multiprocessing import Process, Pipe, Lock
+from multiprocessing.connection import Connection
 from functools import total_ordering
 from heapq import heappush, heappop
 from datetime import datetime, timedelta
@@ -14,7 +15,7 @@ log = get_logger(__name__)
 class Scheduler:
     """
     Deferred actions scheduler
-    Actions are executed in a separate worker at specified times.
+    Tasks are executed in a separate worker at specified times.
     They may be added at any time.
     """
 
@@ -109,6 +110,18 @@ class Scheduler:
                 "forever_interval" : self.forever_interval,
             })
 
+    class TasksQuery:
+        """
+        Scheduled actions query
+        """
+
+        def __init__(self, pipe_we: Connection):
+            """
+            :param pipe_we: Writing end of multiprocessing.Pipe where to write
+                            the query result
+            """
+            self.pipe_we = pipe_we
+
     _shutdown = "shutdown"  # worker shutdown sentinel
     _cancel = "cancel"      # scheduled tasks cancelation sentinel
 
@@ -130,7 +143,7 @@ class Scheduler:
 
         log.info("Scheduler created")
 
-    def _send(self, msg: Union[Scheduler.Task, str]) -> None:
+    def _send(self, msg: Union[Scheduler.Task, TasksQuery, str]) -> None:
         """
         Send message to worker via the pipe
         multiprocessing.Pipe.send calls are mutually exclusive.
@@ -158,6 +171,14 @@ class Scheduler:
         :param task: Task
         """
         self._send(task)
+
+    def tasks(self, pipe: Tuple[Connection, Connection]) -> List[Scheduler.Task]:
+        """
+        :param pipe: multiprocessing.Pipe read & write ends (in that order)
+        :return: List of scheduled tasks (in order of scheduled execution times)
+        """
+        self._send(Scheduler.TasksQuery(pipe[1]))
+        return pipe[0].recv();
 
     def cancel(self) -> None:
         """
@@ -196,6 +217,10 @@ class Scheduler:
                         if task == Scheduler._cancel:
                             log.info(f"Cancelling {len(tasks)} scheduled tasks")
                             tasks = []
+
+                    # State query
+                    elif isinstance(task, Scheduler.TasksQuery):
+                        task.pipe_we.send(sorted(tasks))
 
                     # Schedule task
                     else:
